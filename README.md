@@ -39,7 +39,6 @@
             position: relative;
         }
 
-        /* Scanline overlay */
 body::before {
             content: "";
             position: fixed;
