@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>TAV5C // KERNEL PANIC</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+
+:root{
+  --crimson:#ff0033;
+  --glass:rgba(20,0,0,0.55);
+  --text:#e6d8c3;
+}
+
+body{
+  background: radial-gradient(circle at 50% 20%, #120000, #020000 80%);
+  color:var(--text);
+  font-family:'Space Mono',monospace;
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:40px;
+}
+
+/* card */
+#discord-card{
+  width:460px;
+  background:var(--glass);
+  border:1px solid rgba(255,0,51,.25);
+  border-radius:18px;
+  backdrop-filter:blur(16px);
+  box-shadow:0 0 40px rgba(255,0,51,.15);
+}
+
+/* header */
+#dc-pill{
+  display:flex;
+  gap:16px;
+  padding:20px;
+  align-items:center;
+}
+
+#dc-avatar{
+  width:72px;
+  height:72px;
+  border-radius:10px;
+  border:2px solid var(--crimson);
+  object-fit:cover;
+}
+
+#dc-name{
+  font-size:1.2rem;
+  font-weight:700;
+}
+
+#dc-srow{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+#dc-status-txt{
+  font-size:.9rem;
+}
+
+#dc-dot{
+  width:12px;
+  height:12px;
+  border-radius:50%;
+}
+
+.online{background:#43b581;}
+.idle{background:#faa61a;}
+.dnd{background:#f04747;}
+.offline{background:#555;}
+
+/* body */
+#dc-body{
+  border-top:1px solid rgba(255,0,51,.2);
+  padding:16px 20px;
+}
+
+#dc-act-name{
+  font-size:.85rem;
+  opacity:.6;
+}
+
+#dc-act-detail{
+  font-size:.8rem;
+  line-height:1.6;
+}
+
+/* typing */
+.typing{
+  display:flex;
+  gap:6px;
+}
+.typing span{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--crimson);
+  animation:typing 1.2s infinite;
+}
+.typing span:nth-child(2){animation-delay:.2s;}
+.typing span:nth-child(3){animation-delay:.4s;}
+
+@keyframes typing{
+  0%,100%{opacity:.3;transform:translateY(0)}
+  50%{opacity:1;transform:translateY(-4px)}
+}
+</style>
+</head>
+
+<body>
+
+<div id="discord-card">
+  <div id="dc-pill">
+    <img id="dc-avatar">
+    <div>
+      <div id="dc-name">ikuyo</div>
+      <div id="dc-srow">
+        <div id="dc-dot" class="online"></div>
+        <span id="dc-status-txt">online</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="dc-body">
+    <div id="dc-act-name">Status</div>
+    <div id="dc-act-detail">loading...</div>
+  </div>
+</div>
+
+<script>
+const CFG = {
+  discordId: "899213421587865620"
+};
+
+let avatarSet = false;
+
+/* typing */
+function showTyping(){
+  document.getElementById("dc-act-name").textContent = "Typing...";
+  document.getElementById("dc-act-detail").innerHTML =
+    `<div class="typing"><span></span><span></span><span></span></div>`;
+}
+
+/* apply ONLY status + text */
+function updateStatusOnly(d){
+  if(!d) return;
+
+  const status = d.discord_status || "offline";
+  const dot = document.getElementById("dc-dot");
+  dot.className="";
+  dot.classList.add(status);
+
+  document.getElementById("dc-status-txt").textContent =
+    status === "dnd" ? "do not disturb" : status;
+
+  const custom = d.activities?.find(a=>a.type===4);
+
+  if(custom){
+    document.getElementById("dc-act-name").textContent="Custom Status";
+    document.getElementById("dc-act-detail").textContent=
+      custom.state || "No status";
+  }
+  else if(d.activities?.length){
+    const act=d.activities[0];
+    document.getElementById("dc-act-name").textContent=act.name;
+    document.getElementById("dc-act-detail").textContent=
+      act.details || act.state || "";
+  }
+  else{
+    showTyping();
+  }
+}
+
+/* FULL (only once via websocket) */
+function setAvatar(d){
+  if(avatarSet || !d) return;
+  const u = d.discord_user;
+  document.getElementById("dc-avatar").src =
+    `https://cdn.discordapp.com/avatars/${u.id}/${u.avatar}.png?size=256`;
+  avatarSet = true;
+}
+
+/* websocket (initial load only) */
+const socket = new WebSocket("wss://api.lanyard.rest/socket");
+
+socket.onopen = () => {
+  socket.send(JSON.stringify({
+    op: 2,
+    d: { subscribe_to_id: CFG.discordId }
+  }));
+};
+
+socket.onmessage = (event) => {
+  const msg = JSON.parse(event.data);
+
+  if(msg.t === "INIT_STATE"){
+    const d = msg.d[CFG.discordId];
+    setAvatar(d);
+    updateStatusOnly(d);
+  }
+
+  if(msg.op === 10){
+    setInterval(() => {
+      socket.send(JSON.stringify({ op: 3 }));
+    }, msg.d.heartbeat_interval);
+  }
+};
+
+/* 1.5s refresh (ONLY status/text) */
+setInterval(async () => {
+  try{
+    const res = await fetch(`https://api.lanyard.rest/v1/users/${CFG.discordId}`);
+    const json = await res.json();
+    if(json.success){
+      updateStatusOnly(json.data);
+    }
+  }catch(e){}
+}, 1500);
+</script>
+
+</body>
+</html>
