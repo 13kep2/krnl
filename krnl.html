@@ -12,6 +12,7 @@
 
 :root{
   --crimson:#ff0033;
+  --bg:#020000;
   --glass:rgba(20,0,0,0.55);
   --text:#e6d8c3;
 }
@@ -27,7 +28,20 @@ body{
   padding:40px;
 }
 
-/* card */
+body::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(255,0,51,.04) 0px,
+    rgba(255,0,51,.04) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events:none;
+}
+
 #discord-card{
   width:460px;
   background:var(--glass);
@@ -35,9 +49,15 @@ body{
   border-radius:18px;
   backdrop-filter:blur(16px);
   box-shadow:0 0 40px rgba(255,0,51,.15);
+  animation:flicker 6s infinite;
 }
 
-/* header */
+@keyframes flicker{
+  0%,100%{opacity:1}
+  3%{opacity:.9}
+  6%{opacity:1}
+}
+
 #dc-pill{
   display:flex;
   gap:16px;
@@ -79,7 +99,6 @@ body{
 .dnd{background:#f04747;}
 .offline{background:#555;}
 
-/* body */
 #dc-body{
   border-top:1px solid rgba(255,0,51,.2);
   padding:16px 20px;
@@ -95,22 +114,29 @@ body{
   line-height:1.6;
 }
 
-/* typing */
 .typing{
   display:flex;
   gap:6px;
+  align-items:center;
+  height:16px;
 }
+
 .typing span{
-  width:6px;height:6px;border-radius:50%;
+  width:6px;
+  height:6px;
+  border-radius:50%;
   background:var(--crimson);
+  opacity:.4;
   animation:typing 1.2s infinite;
 }
+
 .typing span:nth-child(2){animation-delay:.2s;}
 .typing span:nth-child(3){animation-delay:.4s;}
 
 @keyframes typing{
-  0%,100%{opacity:.3;transform:translateY(0)}
-  50%{opacity:1;transform:translateY(-4px)}
+  0%{transform:translateY(0); opacity:.3;}
+  50%{transform:translateY(-4px); opacity:1;}
+  100%{transform:translateY(0); opacity:.3;}
 }
 </style>
 </head>
@@ -119,7 +145,7 @@ body{
 
 <div id="discord-card">
   <div id="dc-pill">
-    <img id="dc-avatar" alt="avatar">
+    <img id="dc-avatar">
     <div>
       <div id="dc-name">ikuyo</div>
       <div id="dc-srow">
@@ -141,102 +167,73 @@ const CFG = {
 };
 
 let avatarSet = false;
+let cachedData = null;
 
-/* typing */
 function showTyping(){
-  document.getElementById("dc-act-name").textContent = "Typing...";
+  document.getElementById("dc-act-name").textContent="Typing...";
   document.getElementById("dc-act-detail").innerHTML =
     `<div class="typing"><span></span><span></span><span></span></div>`;
 }
 
-/* FIXED AVATAR */
-function setAvatar(d){
-  if(!d) return;
+// fetch API (slow)
+async function fetchPresence(){
+  try{
+    const res = await fetch(`https://api.lanyard.rest/v1/users/${CFG.discordId}`);
+    const json = await res.json();
+    if(!json.success) return;
 
-  const u = d.discord_user;
-  const img = document.getElementById("dc-avatar");
+    cachedData = json.data;
 
-  if(!u.avatar){
-    const defaultIndex = parseInt(u.discriminator || "0") % 5;
-    img.src = `https://cdn.discordapp.com/embed/avatars/${defaultIndex}.png`;
-    return;
+    const u = cachedData.discord_user;
+
+    if(!avatarSet){
+      document.getElementById("dc-avatar").src =
+        `https://cdn.discordapp.com/avatars/${u.id}/${u.avatar}.png?size=256`;
+      avatarSet = true;
+    }
+
+  }catch(e){
+    showTyping();
   }
-
-  const base = `https://cdn.discordapp.com/avatars/${u.id}/${u.avatar}`;
-  img.src = base + ".webp?size=256";
-
-  img.onerror = () => {
-    img.onerror = null;
-    img.src = base + ".png?size=256";
-  };
 }
 
-/* status + text only */
-function updateStatusOnly(d){
-  if(!d) return;
+// fast UI refresh (1.5s)
+function updateUI(){
+  if(!cachedData) return;
+
+  const d = cachedData;
 
   const status = d.discord_status || "offline";
   const dot = document.getElementById("dc-dot");
-  dot.className="";
+  dot.className = "";
   dot.classList.add(status);
 
   document.getElementById("dc-status-txt").textContent =
     status === "dnd" ? "do not disturb" : status;
 
-  const custom = d.activities?.find(a=>a.type===4);
+  const custom = d.activities?.find(a => a.type === 4);
 
   if(custom){
     document.getElementById("dc-act-name").textContent="Custom Status";
     document.getElementById("dc-act-detail").textContent =
       custom.state || "No status";
-  }
-  else if(d.activities?.length){
-    const act=d.activities[0];
-    document.getElementById("dc-act-name").textContent=act.name;
+  } else if(d.activities?.length){
+    const act = d.activities[0];
+    document.getElementById("dc-act-name").textContent = act.name;
     document.getElementById("dc-act-detail").textContent =
       act.details || act.state || "";
-  }
-  else{
+  } else {
     showTyping();
   }
 }
 
-/* websocket (initial load only) */
-const socket = new WebSocket("wss://api.lanyard.rest/socket");
+// initial
+fetchPresence();
+updateUI();
 
-socket.onopen = () => {
-  socket.send(JSON.stringify({
-    op: 2,
-    d: { subscribe_to_id: CFG.discordId }
-  }));
-};
-
-socket.onmessage = (event) => {
-  const msg = JSON.parse(event.data);
-
-  if(msg.t === "INIT_STATE"){
-    const d = msg.d[CFG.discordId];
-    setAvatar(d);
-    updateStatusOnly(d);
-  }
-
-  if(msg.op === 10){
-    setInterval(() => {
-      socket.send(JSON.stringify({ op: 3 }));
-    }, msg.d.heartbeat_interval);
-  }
-};
-
-/* 1.5s refresh (status + text only) */
-setInterval(async () => {
-  try{
-    const res = await fetch(`https://api.lanyard.rest/v1/users/${CFG.discordId}`);
-    const json = await res.json();
-    if(json.success){
-      updateStatusOnly(json.data);
-    }
-  }catch(e){}
-}, 1500);
+// intervals
+setInterval(fetchPresence, 25000); // API refresh
+setInterval(updateUI, 1500); // UI refresh
 </script>
 
 </body>
