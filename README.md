@@ -13,9 +13,8 @@
             --glass: rgba(20, 0, 0, 0.55);
             --text: #e6d8c3;
         }
-
-        /* Background Video */
-        #bg-video {
+            Background Video
+            #bg-video {
             position: fixed;
             top: 50%;
             left: 50%;
@@ -27,7 +26,6 @@
             z-index: -2;
             object-fit: cover;
         }
-
         body {
             background: radial-gradient(circle at 50% 20%, #120000, #020000 80%);
             color: var(--text);
@@ -42,7 +40,7 @@
         }
 
         /* Scanline overlay */
-        body::before {
+body::before {
             content: "";
             position: fixed;
             inset: 0;
@@ -57,7 +55,7 @@
             z-index: -1;
         }
 
-        #discord-card {
+#discord-card {
             width: 460px;
             background: var(--glass);
             border: 1px solid rgba(255, 0, 51, .25);
@@ -69,20 +67,20 @@
             position: relative;
         }
 
-        @keyframes flicker {
+@keyframes flicker {
             0%, 100% { opacity: 1; }
             3% { opacity: .9; }
             6% { opacity: 1; }
         }
 
-        #dc-pill {
+#dc-pill {
             display: flex;
             gap: 16px;
             padding: 20px;
             align-items: center;
         }
 
-        #dc-avatar {
+#dc-avatar {
             width: 72px;
             height: 72px;
             border-radius: 10px;
@@ -90,55 +88,55 @@
             object-fit: cover;
         }
 
-        #dc-name {
+#dc-name {
             font-size: 1.2rem;
             font-weight: 700;
         }
 
-        #dc-srow {
+#dc-srow {
             display: flex;
             align-items: center;
             gap: 8px;
         }
 
-        #dc-status-txt {
+#dc-status-txt {
             font-size: .9rem;
         }
 
-        #dc-dot {
+#dc-dot {
             width: 12px;
             height: 12px;
             border-radius: 50%;
         }
 
-        .online { background: #43b581; }
+.online { background: #43b581; }
         .idle { background: #faa61a; }
         .dnd { background: #f04747; }
         .offline { background: #555; }
 
-        #dc-body {
+#dc-body {
             border-top: 1px solid rgba(255, 0, 51, .2);
             padding: 16px 20px;
         }
 
-        #dc-act-name {
+#dc-act-name {
             font-size: .85rem;
             opacity: .6;
         }
 
-        #dc-act-detail {
+#dc-act-detail {
             font-size: .8rem;
             line-height: 1.6;
         }
 
-        .typing {
+typing {
             display: flex;
             gap: 6px;
             align-items: center;
             height: 16px;
         }
 
-        .typing span {
+.typing span {
             width: 6px;
             height: 6px;
             border-radius: 50%;
@@ -149,7 +147,7 @@
         .typing span:nth-child(2) { animation-delay: .2s; }
         .typing span:nth-child(3) { animation-delay: .4s; }
 
-        @keyframes typing {
+@keyframes typing {
             0% { transform: translateY(0); opacity: .3; }
             50% { transform: translateY(-4px); opacity: 1; }
             100% { transform: translateY(0); opacity: .3; }
@@ -157,14 +155,14 @@
     </style>
 </head>
 <body>
-
-    <!-- Background Video (notbg.mp4) - wallpaper style, no sound -->
-    <video id="bg-video" autoplay loop muted playsinline>
+<!-- Background Video (notbg.mp4) - wallpaper style, no sound -->
+    
+<video id="bg-video" autoplay loop muted playsinline>
         <source src="notbg.mp4" type="video/mp4">
         Your browser does not support the video tag.
     </video>
 
-    <div id="discord-card">
+<div id="discord-card">
         <div id="dc-pill">
             <img id="dc-avatar">
             <div>
@@ -180,14 +178,13 @@
             <div id="dc-act-detail">loading...</div>
         </div>
     </div>
-
-    <!-- Background Music (main.mp3) - loop + autoplay -->
+<!-- Background Music (main.mp3) - loop + autoplay -->
     <audio id="bg-music" autoplay loop>
         <source src="main.mp3" type="audio/mpeg">
         Your browser does not support the audio element.
     </audio>
 
-    <script>
+<script>
         const CFG = {
             discordId: "899213421587865620"
         };
@@ -200,7 +197,7 @@
                 `<div class="typing"><span></span><span></span><span></span></div>`;
         }
 
-        async function fetchPresence() {
+async function fetchPresence() {
             try {
                 const res = await fetch(`https://api.lanyard.rest/v1/users/${CFG.discordId}`);
                 const json = await res.json();
@@ -217,7 +214,7 @@
             }
         }
 
-        function updateUI() {
+function updateUI() {
             if (!cachedData) return;
             const d = cachedData;
             const status = d.discord_status || "offline";
@@ -227,12 +224,12 @@
             document.getElementById("dc-status-txt").textContent =
                 status === "dnd" ? "do not disturb" : status;
 
-            const custom = d.activities?.find(a => a.type === 4);
+const custom = d.activities?.find(a => a.type === 4);
             if (custom) {
                 document.getElementById("dc-act-name").textContent = "Custom Status";
                 document.getElementById("dc-act-detail").textContent =
                     custom.state || "No status";
-            } else if (d.activities?.length) {
+} else if (d.activities?.length) {
                 const act = d.activities[0];
                 document.getElementById("dc-act-name").textContent = act.name;
                 document.getElementById("dc-act-detail").textContent =
@@ -242,17 +239,17 @@
             }
         }
 
-        // Initial load
+// Initial load
         fetchPresence();
         updateUI();
 
-        // Refresh intervals
+// Refresh intervals
         setInterval(fetchPresence, 25000);
         setInterval(updateUI, 1500);
 
-        // Optional: Restart audio if it gets blocked by browser
+// Optional: Restart audio if it gets blocked by browser
         const music = document.getElementById("bg-music");
         music.volume = 0.4; // Adjust volume if needed (0.0 - 1.0)
-    </script>
+</script>
 </body>
 </html>
