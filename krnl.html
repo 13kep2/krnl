@@ -119,7 +119,7 @@ body{
 
 <div id="discord-card">
   <div id="dc-pill">
-    <img id="dc-avatar">
+    <img id="dc-avatar" alt="avatar">
     <div>
       <div id="dc-name">ikuyo</div>
       <div id="dc-srow">
@@ -149,7 +149,29 @@ function showTyping(){
     `<div class="typing"><span></span><span></span><span></span></div>`;
 }
 
-/* apply ONLY status + text */
+/* FIXED AVATAR */
+function setAvatar(d){
+  if(!d) return;
+
+  const u = d.discord_user;
+  const img = document.getElementById("dc-avatar");
+
+  if(!u.avatar){
+    const defaultIndex = parseInt(u.discriminator || "0") % 5;
+    img.src = `https://cdn.discordapp.com/embed/avatars/${defaultIndex}.png`;
+    return;
+  }
+
+  const base = `https://cdn.discordapp.com/avatars/${u.id}/${u.avatar}`;
+  img.src = base + ".webp?size=256";
+
+  img.onerror = () => {
+    img.onerror = null;
+    img.src = base + ".png?size=256";
+  };
+}
+
+/* status + text only */
 function updateStatusOnly(d){
   if(!d) return;
 
@@ -165,27 +187,18 @@ function updateStatusOnly(d){
 
   if(custom){
     document.getElementById("dc-act-name").textContent="Custom Status";
-    document.getElementById("dc-act-detail").textContent=
+    document.getElementById("dc-act-detail").textContent =
       custom.state || "No status";
   }
   else if(d.activities?.length){
     const act=d.activities[0];
     document.getElementById("dc-act-name").textContent=act.name;
-    document.getElementById("dc-act-detail").textContent=
+    document.getElementById("dc-act-detail").textContent =
       act.details || act.state || "";
   }
   else{
     showTyping();
   }
-}
-
-/* FULL (only once via websocket) */
-function setAvatar(d){
-  if(avatarSet || !d) return;
-  const u = d.discord_user;
-  document.getElementById("dc-avatar").src =
-    `https://cdn.discordapp.com/avatars/${u.id}/${u.avatar}.png?size=256`;
-  avatarSet = true;
 }
 
 /* websocket (initial load only) */
@@ -214,7 +227,7 @@ socket.onmessage = (event) => {
   }
 };
 
-/* 1.5s refresh (ONLY status/text) */
+/* 1.5s refresh (status + text only) */
 setInterval(async () => {
   try{
     const res = await fetch(`https://api.lanyard.rest/v1/users/${CFG.discordId}`);
